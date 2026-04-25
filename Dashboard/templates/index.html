@@ -1,0 +1,1168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sentinel Monitoring Dashboard</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9dT/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    /* Leaflet fallback styles in case CDN stylesheet is blocked. */
+    .leaflet-pane,
+    .leaflet-tile,
+    .leaflet-marker-icon,
+    .leaflet-marker-shadow,
+    .leaflet-tile-container,
+    .leaflet-pane > svg,
+    .leaflet-pane > canvas,
+    .leaflet-zoom-box,
+    .leaflet-image-layer,
+    .leaflet-layer {
+      position: absolute;
+      left: 0;
+      top: 0;
+    }
+    .leaflet-container {
+      overflow: hidden;
+      position: relative;
+      outline: 0;
+      background: #0b1220;
+    }
+    .leaflet-tile {
+      max-width: none;
+      max-height: none;
+      width: 256px;
+      height: 256px;
+    }
+    .leaflet-pane { z-index: 400; }
+    .leaflet-tile-pane { z-index: 200; }
+    .leaflet-overlay-pane { z-index: 400; }
+    .leaflet-shadow-pane { z-index: 500; }
+    .leaflet-marker-pane { z-index: 600; }
+    .leaflet-tooltip-pane { z-index: 650; }
+    .leaflet-popup-pane { z-index: 700; }
+    .leaflet-control { position: relative; z-index: 800; }
+
+    :root {
+      --bg: #030712;
+      --panel: rgba(17, 24, 39, 0.7);
+      --panel-border: rgba(56, 189, 248, 0.15);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.3);
+      --green: #10b981;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --card-gradient: linear-gradient(135deg, rgba(30, 41, 59, 0.5), rgba(15, 23, 42, 0.5));
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.05) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.05) 0px, transparent 50%);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .panel {
+      background: var(--panel);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--panel-border);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+      transition: border-color 0.3s ease;
+    }
+
+    .panel:hover {
+      border-color: rgba(56, 189, 248, 0.3);
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 32px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      background: linear-gradient(to right, #38bdf8, #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .nav {
+      display: flex;
+      gap: 8px;
+    }
+
+    .nav-link {
+      color: var(--muted);
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .nav-link:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .nav-link.active {
+      color: var(--accent);
+      background: rgba(56, 189, 248, 0.1);
+      box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.2);
+    }
+
+    .tabs { display: flex; gap: 10px; margin-top: 15px; }
+    .tab-btn { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(56, 189, 248, 0.2); color: var(--muted); padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .tab-btn:hover { color: var(--text); background: rgba(15, 23, 42, 0.9); }
+    .tab-btn.active { background: var(--accent); color: #030712; border-color: var(--accent); }
+    .tab-content { display: none; flex-direction: column; gap: 20px; }
+    .tab-content.active { display: flex; }
+
+    .hidden-row {
+      display: none;
+    }
+
+    .feed-toggle {
+      margin-top: 12px;
+      padding: 8px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      background: rgba(56, 189, 248, 0.12);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .feed-toggle:hover {
+      background: rgba(56, 189, 248, 0.2);
+    }
+
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 10px;
+    }
+
+    .dashboard-header h1 {
+      margin: 0;
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+
+    .pipeline-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 40px 20px;
+      position: relative;
+      background: rgba(2, 6, 23, 0.3);
+      border-radius: 24px;
+      margin: 10px 0;
+      overflow: hidden;
+    }
+
+    .pipeline-stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      z-index: 2;
+      width: 140px;
+      filter: grayscale(0.5);
+      opacity: 0.7;
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .pipeline-stage.active {
+      filter: grayscale(0);
+      opacity: 1;
+      transform: scale(1.1);
+    }
+
+    .stage-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--card-gradient);
+      border: 1px solid var(--panel-border);
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+      font-size: 24px;
+    }
+
+    .pipeline-stage.active .stage-icon {
+      border-color: var(--accent);
+      box-shadow: 0 0 30px var(--accent-glow);
+    }
+
+    .stage-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .pipeline-stage.active .stage-label {
+      color: var(--accent);
+    }
+
+    .pipeline-connector {
+      flex-grow: 1;
+      height: 2px;
+      background: linear-gradient(to right, rgba(56, 189, 248, 0.1), rgba(56, 189, 248, 0.1));
+      margin: 0 -20px;
+      position: relative;
+      top: -14px;
+    }
+
+    .pipeline-connector::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 40px;
+      height: 100%;
+      background: linear-gradient(to right, transparent, var(--accent), transparent);
+      animation: flow 2s infinite linear;
+      opacity: 0;
+    }
+
+    .pipeline-stage.active + .pipeline-connector::after {
+      opacity: 1;
+    }
+
+    @keyframes flow {
+      from { left: -10%; }
+      to { left: 110%; }
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+
+    .stat-card {
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--accent);
+      opacity: 0.5;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+    }
+
+    .stat-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .status-alert {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 20px;
+      border-radius: 16px;
+      border-left: 6px solid;
+    }
+
+    .status-pulse {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); box-shadow: 0 0 0 0 currentColor; }
+      70% { transform: scale(1.1); box-shadow: 0 0 0 10px transparent; }
+      100% { transform: scale(1); box-shadow: 0 0 0 0 transparent; }
+    }
+
+    .table-container {
+      border-radius: 16px;
+      overflow: hidden;
+      background: rgba(2, 6, 23, 0.2);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+
+    th {
+      background: rgba(15, 23, 42, 0.6);
+      padding: 16px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      text-align: left;
+    }
+
+    td {
+      padding: 14px 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 14px;
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .pill {
+      padding: 4px 12px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .pill-red { background: rgba(239, 68, 68, 0.1); color: var(--red); border: 1px solid rgba(239, 68, 68, 0.2); }
+    .pill-green { background: rgba(16, 185, 129, 0.1); color: var(--green); border: 1px solid rgba(16, 185, 129, 0.2); }
+    .pill-amber { background: rgba(245, 158, 11, 0.1); color: var(--amber); border: 1px solid rgba(245, 158, 11, 0.2); }
+
+    .btn {
+      background: var(--accent);
+      color: #030712;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+
+    .monitor-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .plot {
+      width: 100%;
+      min-height: 350px;
+    }
+
+    #map {
+      width: 100%;
+      height: 520px;
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .filters {
+      display: flex;
+      gap: 16px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    select, input {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 10px 16px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+    }
+
+    select:focus, input:focus {
+      border-color: var(--accent);
+    }
+
+    @media (max-width: 1100px) {
+      .monitor-grid { grid-template-columns: 1fr; }
+    }
+
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    .plot {
+      width: 100%;
+      min-height: 280px;
+    }
+
+    #map {
+      width: 100%;
+      height: 520px;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .legend {
+      position: absolute;
+      bottom: 18px;
+      left: 18px;
+      z-index: 999;
+      background: rgba(2, 6, 23, 0.88);
+      border: 1px solid rgba(148, 163, 184, 0.45);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 12px;
+      color: #cbd5e1;
+    }
+
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 4px;
+    }
+
+    .dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+
+    .dot-green { background: var(--green); }
+    .dot-amber { background: var(--amber); }
+    .dot-red { background: var(--red); }
+
+    .table-wrap {
+      overflow: auto;
+      border-radius: 10px;
+      border: 1px solid rgba(148,163,184,0.16);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 920px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(148,163,184,0.12);
+      vertical-align: top;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    th {
+      color: #cbd5e1;
+      font-size: 12px;
+      text-transform: uppercase;
+      background: rgba(15, 23, 42, 0.92);
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    tr:hover td {
+      background: rgba(30, 41, 59, 0.65);
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+    }
+
+    .pill-green { background: rgba(34,197,94,0.16); color: #86efac; }
+    .pill-amber { background: rgba(245,158,11,0.16); color: #fcd34d; }
+    .pill-red { background: rgba(239,68,68,0.16); color: #fca5a5; }
+
+    .review-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .review-actions button {
+      border: 0;
+      border-radius: 8px;
+      padding: 8px 10px;
+      cursor: pointer;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .approve { background: var(--green); color: #052e16; }
+    .reject { background: var(--red); }
+
+    .section-title {
+      margin: 0 0 10px 0;
+      font-size: 18px;
+      letter-spacing: 0.02em;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .stage-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 12px;
+    }
+
+    .stage-card {
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 12px;
+      padding: 12px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .stage-card.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 15px var(--accent-glow);
+      background: rgba(56, 189, 248, 0.08);
+      transform: translateY(-2px);
+    }
+
+    .stage-card strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 15px;
+    }
+
+    .stage-summary {
+      color: #cbd5e1;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .stage-detail {
+      margin-top: 8px;
+      color: #a5b4fc;
+      font-size: 12px;
+      display: none;
+    }
+
+    .stage-card.expanded .stage-detail {
+      display: block;
+    }
+
+    .stage-keys {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .stage-keys span {
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      color: #bae6fd;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 11px;
+    }
+
+    .time-note {
+      margin-top: 8px;
+      color: #93c5fd;
+      font-size: 12px;
+    }
+
+    .note-box {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(14, 165, 233, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.22);
+      color: #dbeafe;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .feature-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .feature-tile {
+      background: rgba(2, 6, 23, 0.5);
+      border: 1px solid rgba(56, 189, 248, 0.16);
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+
+    .feature-tile strong {
+      display: block;
+      margin-bottom: 4px;
+      color: #dbeafe;
+    }
+
+    .feature-tile div {
+      color: #cbd5e1;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .chart-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 14px;
+    }
+
+    @media (max-width: 1000px) {
+      .grid-2, .grid-3, .chart-grid { grid-template-columns: 1fr; }
+      #map { height: 420px; }
+      .plot { min-height: 260px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="panel topbar">
+      <div class="brand">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        SENTINEL AI
+      </div>
+      <nav class="nav">
+        <a class="nav-link active" href="/monitor">MONITOR</a>
+        <a class="nav-link" href="/sender">SIMULATOR</a>
+      </nav>
+    </header>
+
+    <section class="dashboard-header">
+      <div>
+        <h1>Security Monitoring</h1>
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="tab-overview">Overview</button>
+          <button class="tab-btn" data-tab="tab-feed">Gateway Feed</button>
+          <button class="tab-btn" data-tab="tab-alerts">Alerts</button>
+          <button class="tab-btn" data-tab="tab-queue">Analyst Queue</button>
+        </div>
+      </div>
+      <div class="panel" style="padding: 8px 16px; font-size: 12px; font-weight: 600; color: var(--accent);">
+        <span class="status-pulse" style="display: inline-block; margin-right: 8px; background: var(--accent);"></span>
+        LIVE FEED: {{ local_tz_label }}
+      </div>
+    </section>
+
+    <div id="tab-overview" class="tab-content active">
+    <!-- Pipeline container removed for demo -->
+
+    <div class="stats-grid">
+      <div class="panel stat-card">
+        <div class="stat-label">Throughput</div>
+        <div class="stat-value">{{ event_count }}</div>
+        <div class="stat-sub">Requests in current window</div>
+      </div>
+      <div class="panel stat-card" style="box-shadow: inset 4px 0 0 var(--red);">
+        <div class="stat-label">Anomalies</div>
+        <div class="stat-value">{{ suspicious_events }}</div>
+        <div class="stat-sub">{{ suspicious_rate }} of total traffic</div>
+      </div>
+      <div class="panel stat-card" style="box-shadow: inset 4px 0 0 var(--amber);">
+        <div class="stat-label">Latest Threat</div>
+        <div class="stat-value" style="font-size: 24px; margin-top: 8px;">{{ latest_prediction }}</div>
+        <div class="stat-sub">{{ latest_time }}</div>
+      </div>
+      <div class="panel stat-card">
+        <div class="stat-label">AI Confidence</div>
+        <div class="stat-value">{{ latest_confidence }}</div>
+        <div class="stat-sub">Model certainty score</div>
+      </div>
+    </div>
+
+    <div class="panel status-alert" style="border-color: {{ band_color }}; background: rgba(2, 6, 23, 0.4);">
+      <div class="status-pulse" style="background: {{ band_color }}; color: {{ band_color }};"></div>
+      <div>
+        <div style="font-weight: 800; font-size: 18px; color: {{ band_color }}; text-transform: uppercase; letter-spacing: 0.05em;">{{ band_label }} Detected</div>
+        <div style="color: var(--muted); font-size: 14px; margin-top: 2px;">{{ band_message }}</div>
+      </div>
+    </div>
+
+
+    <div class="panel">
+      <form class="filters" method="get" action="/monitor">
+        <div>
+          <label>Time Window</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="number" id="window_amt" name="window_amt" value="{{ selected_window_amt }}" style="width: 80px;" min="1">
+            <select id="window_unit" name="window_unit">
+              <option value="minutes" {% if selected_window_unit == 'minutes' %}selected{% endif %}>Minutes</option>
+              <option value="hours" {% if selected_window_unit == 'hours' %}selected{% endif %}>Hours</option>
+              <option value="days" {% if selected_window_unit == 'days' %}selected{% endif %}>Days</option>
+              <option value="months" {% if selected_window_unit == 'months' %}selected{% endif %}>Months</option>
+              <option value="years" {% if selected_window_unit == 'years' %}selected{% endif %}>Years</option>
+              <option value="all" {% if selected_window_unit == 'all' %}selected{% endif %}>All Data</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label for="predictions">Prediction Filter</label>
+          <input id="predictions" name="predictions" type="text" value="{{ selected_predictions | join(',') }}" placeholder="Normal,DDoS,Data Exfiltration">
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" type="submit">Apply Filters</button>
+          <a class="btn btn-secondary" href="/monitor">Reset</a>
+        </div>
+      </form>
+    </div>
+
+    <div class="chart-grid">
+      <div class="panel">
+        <h2 class="section-title">Threat Timeline</h2>
+        <div id="timeline" class="plot"></div>
+      </div>
+      <!-- World Map removed for demo -->
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <h2 class="section-title">Threat Gauge</h2>
+        <div id="gauge" class="plot"></div>
+      </div>
+      <div class="panel">
+        <h2 class="section-title">Event Mix</h2>
+        <div id="eventMix" class="plot"></div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <h2 class="section-title">Requests per Minute</h2>
+        <div id="requestsPerMin" class="plot"></div>
+      </div>
+      <div class="panel">
+        <h2 class="section-title">Confidence Trend</h2>
+        <div id="confidenceTrend" class="plot"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2 class="section-title">Entropy Signals</h2>
+      <div id="entropy" class="plot"></div>
+    </div>
+
+    </div> <!-- End tab-overview -->
+
+    <div id="tab-feed" class="tab-content">
+    <div class="panel">
+      <h2 class="section-title">Gateway Decision Feed</h2>
+      {% if gateway_events %}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Source IP</th>
+              <th>Path</th>
+              <th>Threat</th>
+              <th>Decision</th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in gateway_events %}
+            <tr class="gateway-feed-row{% if loop.index > 15 %} hidden-row gateway-feed-extra{% endif %}">
+              <td>{{ row.timestamp }}</td>
+              <td>{{ row.src_ip }}</td>
+              <td>{{ row.path }}</td>
+              <td>{{ row.threat_type }}</td>
+              <td>
+                {% if row.decision|lower == 'block' %}
+                <span class="pill pill-red">BLOCK</span>
+                {% elif row.decision|lower == 'allow' %}
+                <span class="pill pill-green">ALLOW</span>
+                {% else %}
+                <span class="pill pill-amber">{{ row.decision or 'unknown' }}</span>
+                {% endif %}
+              </td>
+              <td>{{ row.reason }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if gateway_events|length > 15 %}
+      <button id="gatewayFeedToggle" class="feed-toggle" type="button" data-expanded="false">Show all {{ gateway_events|length }} entries</button>
+      {% endif %}
+      {% else %}
+      <div class="muted">No gateway decision events yet.</div>
+      {% endif %}
+    </div>
+    </div> <!-- End tab-feed -->
+
+    <div id="tab-alerts" class="tab-content">
+      <div class="panel">
+        <h2 class="section-title">Recent Alerts</h2>
+        {% if recent_alerts %}
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Source IP</th>
+                <th>Prediction</th>
+                <th>Severity</th>
+                <th>MITRE</th>
+                <th>Confidence</th>
+                <th>Risk</th>
+                <th>Path</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in recent_alerts %}
+              <tr>
+                <td>{{ row.timestamp }}</td>
+                <td>{{ row.src_ip }}</td>
+                <td>{{ row.prediction }}</td>
+                <td><span class="pill {% if row.severity == 'Critical' %}pill-red{% else %}pill-amber{% endif %}">{{ row.severity }}</span></td>
+                <td>{{ row.mitre_stage }}</td>
+                <td>{{ row.confidence_score }}</td>
+                <td>{{ row.risk_score }}</td>
+                <td>{{ row.path }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        {% endif %}
+      </div>
+    </div> <!-- End tab-alerts -->
+
+    <div id="tab-queue" class="tab-content">
+      <div class="panel">
+        <h2 class="section-title">Analyst Queue</h2>
+        {% if review_queue %}
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>IP</th>
+                <th>Prediction</th>
+                <th>Risk</th>
+                <th>Confidence</th>
+                <th>Uncertainty</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in review_queue %}
+              <tr>
+                <td>{{ row.timestamp }}</td>
+                <td>{{ row.src_ip }}</td>
+                <td>{{ row.prediction }}</td>
+                <td>{{ row.risk_score }}</td>
+                <td>{{ row.confidence_score }}</td>
+                <td>{{ row.uncertainty_score }}</td>
+                <td>
+                  <div class="review-actions">
+                    <button class="approve" data-feedback='{{ row | tojson }}' data-label="{{ row.prediction }}" data-action="approve">Approve</button>
+                    <button class="reject" data-feedback='{{ row | tojson }}' data-label="Normal" data-action="reject">Reject</button>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="muted">No rows are waiting for analyst review.</div>
+        {% endif %}
+      </div>
+    </div> <!-- End tab-queue -->
+
+    <div class="panel">
+      <h2 class="section-title">Legend</h2>
+      <div class="muted">Normal, suspicious, DDoS, and data-exfiltration rows keep the same interpretations as the earlier dashboard. The separate sender dashboard now handles traffic generation and replay controls.</div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+    const timelineData = {{ timeline_data|tojson }};
+    const requestSeries = {{ requests_per_min|safe }};
+    const confidenceSeries = {{ confidence_timeline|safe }};
+    const eventMixSeries = {{ event_mix|safe }};
+    const entropySeries = {{ entropy_series|safe }};
+
+    const gaugeScore = Number({{ gauge_score|tojson }} || 0);
+    const latestScoreBand = gaugeScore < 40 ? '#22c55e' : (gaugeScore < 80 ? '#f59e0b' : '#ef4444');
+
+    Plotly.newPlot('gauge', [{
+      type: 'indicator',
+      mode: 'gauge+number',
+      value: gaugeScore,
+      number: { suffix: '/100', font: { size: 42 } },
+      title: { text: 'Threat Level' },
+      gauge: {
+        axis: { range: [0, 100] },
+        bar: { color: latestScoreBand },
+        steps: [
+          { range: [0, 40], color: '#11291b' },
+          { range: [40, 80], color: '#2b220d' },
+          { range: [80, 100], color: '#341217' }
+        ],
+        threshold: { line: { color: '#fff', width: 2 }, value: gaugeScore }
+      }
+    }], { margin: { t: 20, b: 20, l: 20, r: 20 }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)' }, { responsive: true, displayModeBar: false });
+
+    Plotly.newPlot('timeline', [{
+      x: timelineData.map((r) => r.timestamp),
+      y: timelineData.map((r) => r.src_ip),
+      mode: 'markers',
+      marker: {
+        size: timelineData.map((r) => Math.max(8, Math.min(26, Number(r.risk_score) / 4))),
+        color: timelineData.map((r) => Number(r.risk_score)),
+        colorscale: [[0, '#22c55e'], [0.5, '#f59e0b'], [1, '#ef4444']],
+        cmin: 0,
+        cmax: 100
+      },
+      text: timelineData.map((r) => `${r.src_ip} | ${r.threat_type} | ${r.risk_score}`),
+      hoverinfo: 'text+x'
+    }], {
+      margin: { t: 10, b: 35, l: 100, r: 10 },
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      xaxis: { color: '#cbd5e1', title: 'Time' },
+      yaxis: { color: '#cbd5e1', title: { text: 'Source IP', standoff: 30 }, automargin: true }
+    }, { responsive: true, displayModeBar: false });
+
+    Plotly.newPlot('requestsPerMin', [{
+      x: requestSeries.map((r) => r.timestamp),
+      y: requestSeries.map((r) => r.requests),
+      mode: 'lines+markers',
+      line: { color: '#38bdf8', width: 3 },
+      marker: { size: 7 }
+    }], {
+      margin: { t: 10, b: 35, l: 35, r: 10 },
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      xaxis: { color: '#cbd5e1', title: 'Time' },
+      yaxis: { color: '#cbd5e1', title: 'Requests' }
+    }, { responsive: true, displayModeBar: false });
+
+    Plotly.newPlot('confidenceTrend', [{
+      x: confidenceSeries.map((r) => r.timestamp),
+      y: confidenceSeries.map((r) => r.confidence_pct),
+      mode: 'lines',
+      line: { color: '#a855f7', width: 3 },
+      fill: 'tozeroy',
+      fillcolor: 'rgba(168, 85, 247, 0.15)'
+    }], {
+      margin: { t: 10, b: 35, l: 35, r: 10 },
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      xaxis: { color: '#cbd5e1', title: 'Time', type: 'category' },
+      yaxis: { color: '#cbd5e1', title: 'Confidence %' }
+    }, { responsive: true, displayModeBar: false });
+
+    Plotly.newPlot('eventMix', [{
+      labels: eventMixSeries.map((r) => r.prediction),
+      values: eventMixSeries.map((r) => r.count),
+      type: 'pie',
+      hole: 0.45,
+      marker: { colors: ['#22c55e', '#f59e0b', '#ef4444', '#38bdf8', '#a855f7'] }
+    }], {
+      margin: { t: 10, b: 20, l: 10, r: 10 },
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      legend: { orientation: 'h', y: -0.05 }
+    }, { responsive: true, displayModeBar: false });
+
+    Plotly.newPlot('entropy', [
+      {
+        x: entropySeries.map((r) => r.timestamp),
+        y: entropySeries.map((r) => r.path_entropy),
+        mode: 'lines',
+        name: 'Path Entropy',
+        line: { color: '#22c55e', width: 3 }
+      },
+      {
+        x: entropySeries.map((r) => r.timestamp),
+        y: entropySeries.map((r) => r.payload_entropy),
+        mode: 'lines',
+        name: 'Payload Entropy',
+        line: { color: '#f59e0b', width: 3 }
+      }
+    ], {
+      margin: { t: 10, b: 35, l: 35, r: 10 },
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      xaxis: { color: '#cbd5e1', title: 'Time', type: 'category' },
+      yaxis: { color: '#cbd5e1', title: 'Entropy' }
+    }, { responsive: true, displayModeBar: false });
+
+    // Map logic removed for demo
+
+    // Map marker logic removed for demo
+
+    // Seed logic removed for demo
+
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    // WebSocket geo stream removed for demo
+
+    document.querySelectorAll('[data-feedback]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const feedback = JSON.parse(button.getAttribute('data-feedback'));
+        const analystLabel = button.getAttribute('data-label') || 'Normal';
+        const reviewAction = button.getAttribute('data-action') || 'approve';
+        const payload = {
+          timestamp: feedback.timestamp,
+          src_ip: feedback.src_ip,
+          method: feedback.method,
+          path: feedback.path,
+          status_code: Number(feedback.status_code || 0),
+          duration_ms: Number(feedback.duration_ms || 0),
+          payload_size_bytes: Number(feedback.payload_size_bytes || 0),
+          auth_header_present: Boolean(feedback.auth_header_present),
+          prediction: feedback.prediction,
+          confidence_score: Number(feedback.confidence_score || 0),
+          risk_score: Number(feedback.risk_score || 0),
+          uncertainty_score: Number(feedback.uncertainty_score || 0),
+          review_required: Boolean(feedback.review_required),
+          analyst_label: analystLabel,
+          review_action: reviewAction,
+          notes: '',
+          mitre_stage: feedback.mitre_stage || ''
+        };
+
+        const response = await fetch('/api/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          alert('Feedback submission failed');
+          return;
+        }
+
+        button.textContent = 'Sent';
+        button.disabled = true;
+      });
+    });
+
+    document.querySelectorAll('.stage-card').forEach((card) => {
+      card.addEventListener('click', () => {
+        card.classList.toggle('expanded');
+      });
+    });
+
+    const gatewayFeedToggle = document.getElementById('gatewayFeedToggle');
+    if (gatewayFeedToggle) {
+      gatewayFeedToggle.addEventListener('click', () => {
+        const expanded = gatewayFeedToggle.getAttribute('data-expanded') === 'true';
+        document.querySelectorAll('.gateway-feed-extra').forEach((row) => {
+          row.classList.toggle('hidden-row', expanded);
+        });
+        gatewayFeedToggle.setAttribute('data-expanded', expanded ? 'false' : 'true');
+        gatewayFeedToggle.textContent = expanded
+          ? `Show all {{ gateway_events|length }} entries`
+          : 'Show only latest 15 entries';
+      });
+    }
+    
+    // Pipeline animation removed for demo
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.getAttribute('data-tab')).classList.add('active');
+        
+        // Trigger resize so Plotly charts render correctly when they become visible
+        window.dispatchEvent(new Event('resize'));
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+.venv/
+venv/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# .NET
+bin/
+obj/
+*.user
+*.userosscache
+*.sln.docuser
+
+# Database & Logs
+*.db
+*.db-wal
+*.db-shm
+*.csv
+Shared/logs/
+
+# Environment / VS Code
+.vscode/
+.idea/
+.DS_Store
+.env
+
+# Streamlit
+.streamlit/

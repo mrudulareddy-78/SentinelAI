@@ -1,0 +1,16 @@
+[live_sender] Mode: auth_attack
+[live_sender] Gateway: http://localhost:5050
+[live_sender] Polling http://localhost:5050/posts every 0.0s
+[live_sender] Press Ctrl+C to stop
+Traceback (most recent call last):
+  File "C:\Users\rr2k1\OneDrive\Desktop\Sentinel\live_sender.py", line 383, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\rr2k1\OneDrive\Desktop\Sentinel\live_sender.py", line 352, in main
+    token = get_token(args.subject)
+  File "C:\Users\rr2k1\OneDrive\Desktop\Sentinel\live_sender.py", line 69, in get_token
+    response.raise_for_status()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\rr2k1\OneDrive\Desktop\Sentinel\Intelligence\.venv\Lib\site-packages\requests\models.py", line 1024, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 403 Client Error: Forbidden for url: http://localhost:5050/token?subject=sentinel-live-sender

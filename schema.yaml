@@ -1,0 +1,104 @@
+# File: schema.yaml
+openapi: 3.0.3
+info:
+  title: Sentinel Demo API Contract
+  version: 1.0.0
+paths:
+  /posts:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - body
+                - userId
+                - eventType
+              properties:
+                title:
+                  type: string
+                  minLength: 5
+                body:
+                  type: string
+                  minLength: 10
+                userId:
+                  type: integer
+                  minimum: 1
+                eventType:
+                  type: string
+                  enum: [normal, suspicious, attack]
+                sequence:
+                  type: integer
+                  minimum: 1
+                timestamp:
+                  type: number
+  /posts/{id}:
+    put:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - body
+                - userId
+              properties:
+                title:
+                  type: string
+                  minLength: 5
+                body:
+                  type: string
+                  minLength: 10
+                userId:
+                  type: integer
+                  minimum: 1
+                status:
+                  type: string
+                  enum: [draft, published, archived]
+    patch:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [draft, published, archived]
+                reviewNote:
+                  type: string
+                  minLength: 3
+  /comments:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - postId
+                - name
+                - email
+                - body
+              properties:
+                postId:
+                  type: integer
+                  minimum: 1
+                name:
+                  type: string
+                  minLength: 3
+                email:
+                  type: string
+                  minLength: 5
+                body:
+                  type: string
+                  minLength: 5

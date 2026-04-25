@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sentinel — Live Sender Control</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter',sans-serif;background:#0b1220;color:#e2e8f0;min-height:100vh}
+    .wrap{max-width:1200px;margin:0 auto;padding:20px}
+    .card{background:rgba(15,23,42,.8);border:1px solid rgba(148,163,184,.18);border-radius:16px;padding:20px;margin-bottom:16px}
+    .card-title{font-size:16px;font-weight:700;margin-bottom:12px}
+    .topbar{display:flex;align-items:center;justify-content:space-between}
+    .brand{font-size:22px;font-weight:800;background:linear-gradient(135deg,#38bdf8,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .nav a{color:#e2e8f0;text-decoration:none;padding:8px 16px;border-radius:10px;border:1px solid rgba(148,163,184,.25);font-weight:600;font-size:13px;margin-left:8px}
+    .nav a.active{background:rgba(34,197,94,.15);border-color:rgba(34,197,94,.6);color:#86efac}
+    .gw-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .gw-row input{flex:1;min-width:200px;max-width:500px;background:rgba(2,6,23,.7);border:1px solid rgba(56,189,248,.25);border-radius:10px;padding:10px 14px;color:#e2e8f0;font-size:14px}
+    .btn{border:0;border-radius:10px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+    .btn-cyan{background:linear-gradient(135deg,#0ea5e9,#38bdf8);color:#0c1929}
+    .btn-green{background:linear-gradient(135deg,#16a34a,#22c55e);color:#052e16}
+    .btn-red{background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff}
+    .btn-ghost{background:rgba(51,65,85,.7);color:#e2e8f0}
+    .gw-badge{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:6px 14px;border-radius:999px;background:rgba(100,116,139,.2);color:#94a3b8}
+    .gw-dot{width:8px;height:8px;border-radius:50%;background:#64748b;display:inline-block}
+    .hint{color:#64748b;font-size:12px;margin-top:8px}
+
+    .pipe-row{display:flex;align-items:center;justify-content:center;padding:16px 0;flex-wrap:nowrap}
+    .stg{display:flex;flex-direction:column;align-items:center;width:100px}
+    .stg-icon{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;border:2px solid rgba(148,163,184,.2);background:rgba(15,23,42,.8)}
+    .stg-name{margin-top:6px;font-size:10px;font-weight:700;text-transform:uppercase;color:#94a3b8}
+    .stg-info{font-size:9px;color:#64748b;margin-top:2px;text-align:center}
+    .arr{width:24px;height:2px;background:rgba(148,163,184,.2);margin-top:-18px;flex-shrink:0;position:relative}
+    .arr::after{content:'';position:absolute;right:0;top:-4px;border:4px solid transparent;border-left:5px solid rgba(148,163,184,.25)}
+    .stg.active .stg-icon{border-color:#38bdf8;box-shadow:0 0 16px rgba(56,189,248,.3)}
+    .stg.active .stg-name{color:#38bdf8}
+    .stg.done .stg-icon{border-color:#22c55e;box-shadow:0 0 12px rgba(34,197,94,.2)}
+    .stg.done .stg-name{color:#22c55e}
+    .stg.blocked .stg-icon{border-color:#ef4444;box-shadow:0 0 16px rgba(239,68,68,.3)}
+    .stg.blocked .stg-name{color:#ef4444}
+    .arr.lit{background:linear-gradient(90deg,#22c55e,#38bdf8)}
+    .arr.lit::after{border-left-color:#38bdf8}
+    .d-banner{padding:10px 16px;border-radius:10px;font-weight:700;font-size:14px;text-align:center;display:none;margin-top:8px}
+    .d-banner.show{display:block}
+    .d-banner.allow{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.4);color:#86efac}
+    .d-banner.block{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:#fca5a5}
+
+    .ctrl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .fld label{display:block;font-size:10px;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;font-weight:600}
+    .fld input,.fld select{width:100%;background:rgba(2,6,23,.7);color:#e2e8f0;border:1px solid rgba(148,163,184,.2);border-radius:8px;padding:8px 10px;font-size:13px}
+    .full{grid-column:1/-1}
+    .act-row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+    .status-row{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+    .badge{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700}
+    .badge-run{background:rgba(34,197,94,.15);color:#86efac;border:1px solid rgba(34,197,94,.4)}
+    .badge-stop{background:rgba(100,116,139,.15);color:#94a3b8;border:1px solid rgba(100,116,139,.3)}
+    .meta{font-size:12px;color:#64748b}
+
+    .logbox{min-height:200px;max-height:350px;overflow-y:auto;background:rgba(2,6,23,.85);border:1px solid rgba(148,163,184,.12);border-radius:10px;padding:12px;font-family:Consolas,monospace;font-size:12px;line-height:1.6;white-space:pre-wrap;color:#cbd5e1}
+
+    .dpi{display:grid;grid-template-columns:1fr 2fr;gap:14px}
+    .dpi-stack{display:flex;flex-direction:column;gap:10px}
+    .fc{background:rgba(2,6,23,.5);border:1px solid rgba(56,189,248,.12);border-radius:10px;padding:12px}
+    .fc strong{display:block;margin-bottom:4px;color:#bae6fd;font-size:13px}
+    .fc p{color:#94a3b8;font-size:12px;line-height:1.4;margin:0}
+    .fg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    @media(max-width:800px){.ctrl-grid,.fg{grid-template-columns:1fr 1fr}.dpi{grid-template-columns:1fr}}
+    @media(max-width:500px){.ctrl-grid,.fg{grid-template-columns:1fr}.pipe-row{flex-wrap:wrap;gap:4px}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card topbar">
+    <div class="brand">⛨ Sentinel</div>
+    <div class="nav"><a href="/monitor">Monitoring</a><a class="active" href="/sender">Live Sender</a></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🌐 Gateway Entry</div>
+    <div class="gw-row">
+      <input id="gatewayUrl" type="text" value="http://127.0.0.1:5050">
+      <button class="btn btn-cyan" id="checkGwBtn">⚡ Check</button>
+      <span id="gwStatus" class="gw-badge"><span class="gw-dot"></span> Not Checked</span>
+    </div>
+    <p class="hint">Enter the gateway address and verify connectivity before starting traffic.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🔗 Security Pipeline</div>
+    <div class="pipe-row" id="pipeline">
+      <div class="stg" id="stage-send"><div class="stg-icon">📤</div><div class="stg-name">Send</div><div class="stg-info">Build payload</div></div>
+      <div class="arr" id="arrow-0"></div>
+      <div class="stg" id="stage-encrypt"><div class="stg-icon">🔒</div><div class="stg-name">Encrypt</div><div class="stg-info">AES-256-CBC</div></div>
+      <div class="arr" id="arrow-1"></div>
+      <div class="stg" id="stage-gateway"><div class="stg-icon">🛡️</div><div class="stg-name">Gateway</div><div class="stg-info">Port 5050</div></div>
+      <div class="arr" id="arrow-2"></div>
+      <div class="stg" id="stage-decrypt"><div class="stg-icon">🔓</div><div class="stg-name">Decrypt</div><div class="stg-info">Verify IV+key</div></div>
+      <div class="arr" id="arrow-3"></div>
+      <div class="stg" id="stage-validate"><div class="stg-icon">📋</div><div class="stg-name">Validate</div><div class="stg-info">Schema+JWT</div></div>
+      <div class="arr" id="arrow-4"></div>
+      <div class="stg" id="stage-decide"><div class="stg-icon">⚖️</div><div class="stg-name">Decision</div><div class="stg-info" id="decisionSub">Pending...</div></div>
+    </div>
+    <div class="d-banner" id="decisionBanner"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">⚙️ Traffic Controls</div>
+    <div class="status-row"><strong>Status:</strong> <span id="senderStatus" class="badge badge-stop">STOPPED</span> <span id="senderMeta" class="meta"></span></div>
+    <div class="ctrl-grid">
+      <div class="fld"><label>Attack Mode</label><select id="mode">{% for mode in modes %}<option value="{{ mode }}" {% if defaults.mode == mode %}selected{% endif %}>{{ mode }}</option>{% endfor %}</select></div>
+      <div class="fld"><label>Interval (s)</label><input id="interval" type="number" step="0.1" value="{{ defaults.interval }}"></div>
+      <div class="fld"><label>Count (0=∞)</label><input id="count" type="number" step="1" value="{{ defaults.count }}"></div>
+      <div class="fld"><label>User ID</label><input id="user_id" type="number" step="1" value="{{ defaults.user_id }}"></div>
+      <div class="fld"><label>Subject</label><input id="subject" type="text" value="{{ defaults.subject }}"></div>
+      <div class="fld"><label>Title</label><input id="title" type="text" value="{{ defaults.title }}"></div>
+      <div class="fld full"><label>Body</label><input id="body" type="text" value="{{ defaults.body }}"></div>
+    </div>
+    <div class="act-row">
+      <button class="btn btn-green" id="startBtn">▶ Start</button>
+      <button class="btn btn-red" id="stopBtn">■ Stop</button>
+      <button class="btn btn-ghost" id="refreshBtn">↻ Refresh</button>
+      <button class="btn btn-ghost" id="flushBtn" style="color:#fca5a5">🗑️ Reset</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📜 Live Sender Logs</div>
+    <div id="logBox" class="logbox">Waiting for logs...</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🔍 Deep Packet Inspector</div>
+    <div class="dpi">
+      <div class="dpi-stack">
+        <div class="fc"><strong>🔑 AES-256 Key</strong><p id="aesKeyDisplay" style="font-family:monospace;word-break:break-all;color:#86efac;font-size:11px">SentinelAES256Key-1234567890ABCD</p></div>
+        <div class="fc"><strong>🎲 IV</strong><p id="ivDisplay" style="font-family:monospace;color:#38bdf8">Pending...</p></div>
+        <div class="fc"><strong>🛡️ Threat</strong><p id="threatDisplay" style="font-weight:800;font-size:16px">-</p></div>
+      </div>
+      <div class="fc"><strong>📄 Decrypted Payload</strong><div id="payloadDisplay" style="background:rgba(2,6,23,.8);border-radius:8px;padding:10px;font-family:monospace;font-size:12px;color:#e2e8f0;height:170px;overflow-y:auto;white-space:pre-wrap">Waiting for traffic...</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">✨ How It Works</div>
+    <div class="fg">
+      <div class="fc"><strong>🌐 Gateway</strong><p>Connects to the API Gateway on Port 5050 and verifies health.</p></div>
+      <div class="fc"><strong>🔒 AES-256</strong><p>Payloads encrypted with AES-256-CBC, random IV per packet.</p></div>
+      <div class="fc"><strong>🔓 Decrypt</strong><p>Gateway reads IV header, decrypts body, validates schema.</p></div>
+      <div class="fc"><strong>⚖️ Decision</strong><p>Every request gets allow/block. Logged for audit.</p></div>
+      <div class="fc"><strong>🤖 ML</strong><p>Random Forest classifies Normal, DDoS, or Exfiltration.</p></div>
+      <div class="fc"><strong>📊 Dual UI</strong><p>Sender for traffic control, Monitor for analytics.</p></div>
+    </div>
+  </div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+function senderPayload(){return{gateway:$('gatewayUrl').value.trim(),mode:$('mode').value,interval:Number($('interval').value||1),count:Number($('count').value||0),user_id:Number($('user_id').value||101),subject:$('subject').value,title:$('title').value,body:$('body').value}}
+async function checkGateway(){const u=$('gatewayUrl').value.trim(),s=$('gwStatus');s.className='gw-badge';s.innerHTML='<span class="gw-dot"></span> Checking...';try{const r=await fetch('/api/gateway/health?url='+encodeURIComponent(u)),d=await r.json();if(d.reachable){s.style.background='rgba(34,197,94,.15)';s.style.color='#86efac';s.innerHTML='<span class="gw-dot" style="background:#22c55e;box-shadow:0 0 8px #22c55e"></span> Connected'}else{s.style.background='rgba(239,68,68,.15)';s.style.color='#fca5a5';s.innerHTML='<span class="gw-dot" style="background:#ef4444"></span> Unreachable'}}catch(e){s.style.background='rgba(239,68,68,.15)';s.style.color='#fca5a5';s.innerHTML='<span class="gw-dot" style="background:#ef4444"></span> Error'}}
+$('checkGwBtn').onclick=checkGateway;
+function setStatus(r,m){const b=$('senderStatus');b.textContent=r?'RUNNING':'STOPPED';b.className=r?'badge badge-run':'badge badge-stop';$('senderMeta').textContent=m||''}
+async function refreshStatus(){const r=await fetch('/api/sender/status'),d=await r.json();setStatus(d.running,d.running?'PID:'+d.pid:'Exit:'+(d.exit_code??'-'));return d.running}
+async function refreshLogs(){const r=await fetch('/api/sender/logs'),d=await r.json(),l=Array.isArray(d.lines)?d.lines:[],b=$('logBox');b.textContent=l.length?l.join('\n'):'No logs yet.';b.scrollTop=b.scrollHeight}
+async function startSender(){const r=await fetch('/api/sender/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(senderPayload())});if(!r.ok){const p=await r.json().catch(()=>({}));alert(p.error||'Failed')}await refreshStatus();await refreshLogs();runAnim()}
+async function stopSender(){await fetch('/api/sender/stop',{method:'POST'});await refreshStatus();await refreshLogs();resetPipe()}
+$('startBtn').onclick=startSender;$('stopBtn').onclick=stopSender;
+$('refreshBtn').onclick=async()=>{await refreshStatus();await refreshLogs()};
+$('flushBtn').onclick=async()=>{if(confirm('Reset system?')){await fetch('/api/admin/flush',{method:'POST'});alert('Reset Complete.');location.reload()}};
+const S=['send','encrypt','gateway','decrypt','validate','decide'],A=[0,1,2,3,4];let isAnimating=false;
+function resetPipe(){S.forEach(s=>{$('stage-'+s).className='stg'});A.forEach(i=>{$('arrow-'+i).className='arr'});$('decisionBanner').className='d-banner';$('decisionBanner').textContent='';$('decisionSub').textContent='Pending...';}
+async function runAnim(){
+  if(isAnimating)return;
+  isAnimating=true;
+  while(await refreshStatus()){
+    for(let i=0;i<S.length;i++){
+      const e=$('stage-'+S[i]);e.className='stg active';
+      if(i>0)$('arrow-'+(i-1)).className='arr lit';
+      await new Promise(r=>setTimeout(r,100));
+      e.className='stg done';
+    }
+    try{
+      const dr=await fetch('/api/gateway/decisions?limit=1'),dd=await dr.json();
+      if(dd.events&&dd.events.length>0){
+        const ev=dd.events[0];
+        $('ivDisplay').textContent=ev.iv||'N/A';
+        $('threatDisplay').textContent=ev.threat_type||'Normal';
+        $('threatDisplay').style.color=ev.threat_type==='Normal'?'#86efac':'#fca5a5';
+        try{$('payloadDisplay').textContent=JSON.stringify(JSON.parse(ev.payload_excerpt||'{}'),null,2)}catch{$('payloadDisplay').textContent=ev.payload_excerpt||''}
+        const bl=(ev.decision||'').toLowerCase()==='block',de=$('stage-decide'),bn=$('decisionBanner');
+        if(bl){de.className='stg blocked';bn.className='d-banner block show';bn.textContent='⛔ BLOCKED'}else{de.className='stg done';bn.className='d-banner allow show';bn.textContent='✅ ALLOWED'}
+      }
+    }catch{}
+    await new Promise(r=>setTimeout(r,500));
+    S.forEach(s=>$('stage-'+s).className='stg');A.forEach(i=>$('arrow-'+i).className='arr');
+    await new Promise(r=>setTimeout(r,100));
+  }
+  isAnimating=false;
+  resetPipe();
+}
+async function poll(){const r=await refreshStatus();await refreshLogs();if(r&&!isAnimating)runAnim()}poll();setInterval(poll,3000);
+</script>
+</body>
+</html>

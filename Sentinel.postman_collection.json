@@ -1,0 +1,90 @@
+{
+  "info": {
+    "name": "Sentinel Gateway",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5050"
+    },
+    {
+      "key": "token",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Get Token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "pm.collectionVariables.set('token', body.access_token);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/token?subject=postman-user",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "token"
+          ],
+          "query": [
+            {
+              "key": "subject",
+              "value": "postman-user"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Post 1",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/posts/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "posts",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/health",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      }
+    }
+  ]
+}
