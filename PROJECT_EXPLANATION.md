@@ -327,7 +327,7 @@ The project is already a strong demo, but these improvements would make it clean
 
 1. Fix `Intelligence/inference.py` so it calls `main()` only once at the bottom of the file.
 2. Clean `Intelligence/requirements.txt`; the Redis dependency line appears to contain NUL characters and may break installs.
-3. Update older docs such as `README.md` and `ARCHITECTURE.md` because some sections still mention CSV and Streamlit even though the current app uses SQLite and Flask.
+3. Ensure documentation consistently references the shared SQLite DB (`Shared/logs/sentinel.db`) and the Flask-based dashboard (replace legacy CSV/Streamlit references).
 4. Align `Intelligence/test_inference.py` with the current SQLite-based inference code. It still imports older CSV-era functions that no longer exist.
 5. Move demo secrets from `Gateway/appsettings.json` into environment variables for real deployments.
 6. Re-enable and fully wire blacklist enforcement if blocking blacklisted IPs is required. Currently the Gateway blacklist check is disabled for demo behavior.

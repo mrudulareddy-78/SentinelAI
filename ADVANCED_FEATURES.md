@@ -145,7 +145,7 @@ python ddos_simulator.py ddos 200
 ```
 
 **What This Does:**
-1. Appends 200 rows to `Shared/logs/traffic_log.csv`
+1. Records 200 new request events in `Shared/logs/sentinel.db` (table `requests`)
 2. Requests are from IPs: `10.0.0.x` with fast duration (0.5-2ms)
 3. Large payloads: 100-800 bytes each
 4. Inference pipeline processes and marks as "DDoS"
@@ -214,30 +214,33 @@ dotnet run
 
 # Terminal 2: Start Intelligence
 cd Sentinel\Intelligence
-venv\Scripts\activate
+# create and activate virtualenv (recommended .venv)
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 python train_model.py  # If model doesn't exist
 python inference.py
 
 # Terminal 3: Start Dashboard
-cd Sentinel\Intelligence
-venv\Scripts\activate
-streamlit run ..\Dashboard\app.py
+cd Sentinel\Dashboard
+.venv\Scripts\Activate.ps1
+python app.py
 
 # Terminal 4: Generate attack traffic
 cd Sentinel\Intelligence
-venv\Scripts\activate
+.venv\Scripts\Activate.ps1
 
 # Baseline: 5 normal requests
 python ddos_simulator.py normal 5
-# Expected: 5 "Normal" predictions in inference_log.csv
+# Expected: 5 "Normal" predictions written to Shared/logs/sentinel.db (table `inferences`)
 
 # Attack: 200 DDoS requests
 python ddos_simulator.py ddos 200
 # Expected: Threat gauge turns RED, alerts appear in dashboard
 
-# Verify results
-type Shared\logs\inference_log.csv | tail -20
-# Should show "DDoS" predictions with 70%+ confidence
+# Verify results (example using sqlite3):
+sqlite3 Shared/logs/sentinel.db "SELECT * FROM inferences ORDER BY id DESC LIMIT 20;"
+# Should show recent predictions with confidence values (e.g. "DDoS")
 ```
 
 ---
@@ -422,7 +425,7 @@ private const int RequestsPerMinute = 500;  // Increase from 300
 
 ### Issue: DDoS Simulator Hangs
 
-**Solution:** Check CSV file is not locked:
+**Solution:** Ensure SQLite DB is accessible (WAL mode avoids locks):
 
 ```powershell
 # Close inference.py if running
@@ -435,15 +438,16 @@ python ddos_simulator.py ddos 100
 
 **Solution:**
 
-1. Verify `Shared/logs/inference_log.csv` exists
+1. Verify `Shared/logs/sentinel.db` exists and contains the `inferences` table
 2. Run inference manually:
-   ```powershell
-   python inference.py  # Watch for 10 seconds
-   ```
-3. Restart Streamlit:
-   ```powershell
-   streamlit run ..\Dashboard\app.py --logger.level=debug
-   ```
+  ```powershell
+  python inference.py  # Watch for 10 seconds
+  ```
+3. Restart the Flask dashboard:
+  ```powershell
+  cd ..\Dashboard
+  python app.py --logger.level=debug
+  ```
 
 ---
 

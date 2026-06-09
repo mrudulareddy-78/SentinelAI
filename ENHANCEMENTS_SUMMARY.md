@@ -264,8 +264,8 @@ dotnet run  # Shows: "Now listening on: http://localhost:5050"
 
 # Terminal 2: Start Intelligence
 cd Sentinel\Intelligence
-venv\Scripts\activate
-python inference.py  # Shows: "Watching traffic_log.csv..."
+.venv\Scripts\Activate.ps1
+python inference.py  # Polls `requests` table in Shared/logs/sentinel.db and processes new events
 
 # Terminal 3: Run Attack Simulation
 cd Sentinel\Intelligence

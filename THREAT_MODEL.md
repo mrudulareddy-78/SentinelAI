@@ -199,40 +199,23 @@ Sentinel is designed to detect and mitigate advanced, behavior-based network att
 ## Attack Scenarios & Detection
 
 ### Scenario 1: DDoS Wave
-
-**Attacker Goal:** Exhaust gateway resources
-
-**Attack Profile:**
 - 1000 requests/min from `10.0.1.100`
 - 50-byte payloads (SYN flood-like)
-- Mixed status codes (200, 503)
-
-**Detection:**
 1. **Rate Limiter:** Reject after 300 requests → 429 Too Many Requests
 2. **Logging:** Spike in 429 responses in traffic_log.csv
 3. **ML Detection:** Request frequency + payload size → "DDoS" (95% confidence)
-
-**Timeline:**
+ ✅ Payload size logging: Detected in `Shared/logs/sentinel.db` (table `requests`)
 - T+0s: First requests arrive
-- T+10s: Rate limiting threshold hit
 - T+15s: Inference pipeline processes 300 requests
 - T+20s: Dashboard shows red threat gauge (DDoS detected)
 
-**Recovery:** Attacker blocked for remaining window
-
----
 
 ### Scenario 2: Data Exfiltration
-
-**Attacker Goal:** Extract customer database
-
 **Attack Profile:**
 - 50 authenticated requests (valid JWT)
 - 5KB-10KB payloads each
-- All return 200 OK
-- Spread over 2 minutes
+ ✅ Logging: Failed auth attempts logged to `Shared/logs/sentinel.db` (table `requests`)
 
-**Detection:**
 1. **Payload Size:** Average 7.5KB per request → flagged in logs
 2. **Frequency:** 50 requests to `/data` endpoint in 2 min
 3. **ML Detection:** Feature vector [duration=1000ms, src_bytes=7500, count=50] → "Data Exfiltration" (90% confidence)
@@ -241,19 +224,9 @@ Sentinel is designed to detect and mitigate advanced, behavior-based network att
 - T+0s: First large payload request
 - T+120s: 50 requests completed
 - T+130s: Inference completes batch
-- T+140s: Dashboard alerts: "Data Exfiltration" table updated
-
-**Recovery:** Revoke JWT token; audit database access logs
-
----
-
-### Scenario 3: Path Traversal Attack
-
 **Attacker Goal:** Access `/admin` endpoint via path normalization
-
-**Attack Profile:**
-- GET `/posts/../../admin/users`
-- Encoded variant: `GET /posts/..%2F..%2Fadmin%2Fusers`
+ ✅ Logging: Failed auth attempts logged to `Shared/logs/sentinel.db` (table `requests`)
+ **SQLite-based SIEM (local):** Good for local demos, not for enterprise scale
 
 **Detection:**
 1. **ValidationMiddleware:** Regex rejects `..` patterns → 400 Bad Request
@@ -261,10 +234,8 @@ Sentinel is designed to detect and mitigate advanced, behavior-based network att
 3. **ML Skips:** Request never reaches inference layer
 
 **Timeline:**
-- T+0s: Malformed request arrives
-- T+1ms: Validation middleware rejects
+ 400 entry in `Shared/logs/sentinel.db` (table `requests`)
 - T+5ms: 400 response sent to attacker
-
 **Recovery:** Attacker receives error; legitimate users unaffected
 
 ---

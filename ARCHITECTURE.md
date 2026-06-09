@@ -12,19 +12,19 @@ Sentinel is a zero-trust, multi-layered API gateway that combines network defens
                          ▼
         ┌────────────────────────────────┐
         │  Layer 1: YARP Gateway         │
-        │  ├─ Port 5050                  │
-        │  ├─ JWT Authentication         │
-        │  ├─ AES-256-CBC Decryption    │
-        │  ├─ Request Validation         │
-        │  ├─ Security Headers           │
-        │  ├─ Rate Limiting (300 req/min)│
-        │  └─ telemetry → traffic_log.csv│
+      │  ├─ Port 5050                  │
+      │  ├─ JWT Authentication         │
+      │  ├─ AES-256-CBC Decryption    │
+      │  ├─ Request Validation         │
+      │  ├─ Security Headers           │
+      │  ├─ Rate Limiting (300 req/min)│
+      │  └─ telemetry → Shared/logs/sentinel.db (table `requests`)│
         └────────────────────────────────┘
                          │
                          ▼
         ┌────────────────────────────────┐
-        │ Shared CSV Communication Layer  │
-        │ (traffic_log.csv)              │
+      │ Shared SQLite Communication Layer │
+      │ (`Shared/logs/sentinel.db`)    │
         └────────────────────────────────┘
                          │
                          ▼
@@ -34,16 +34,16 @@ Sentinel is a zero-trust, multi-layered API gateway that combines network defens
         │ ├─ Random Forest Classifier    │
         │ ├─ Feature Engineering         │
         │ ├─ 120K+ NSL-KDD trained model│
-        │ └─ predictions → inference_log.csv
+      │ └─ predictions → `Shared/logs/sentinel.db` (table `inferences`)
         └────────────────────────────────┘
                          │
                          ▼
         ┌────────────────────────────────┐
-        │ Layer 3: Streamlit Dashboard   │
-        │ ├─ Real-time threat gauge      │
-        │ ├─ Traffic heatmap             │
-        │ ├─ Alert table                 │
-        │ └─ Attack distribution pie     │
+      │ Layer 3: Dashboard (Flask)     │
+      │ ├─ Real-time threat gauge      │
+      │ ├─ Traffic heatmap             │
+      │ ├─ Alert table                 │
+      │ └─ Attack distribution pie     │
         └────────────────────────────────┘
                          │
                          ▼
@@ -101,7 +101,7 @@ Sentinel is a zero-trust, multi-layered API gateway that combines network defens
 1. `SecurityHeadersMiddleware` — Adds X-Content-Type-Options, CSP, HSTS
 2. `ValidationMiddleware` — Validates path, content-type, payload size
 3. `RateLimitMiddleware` — Token bucket rate limiter (300 req/min)
-4. `LoggingMiddleware` — Writes request metadata to traffic_log.csv
+4. `LoggingMiddleware` — Writes request metadata into the `requests` table in `Shared/logs/sentinel.db`
 5. `AesDecryptionMiddleware` — Decrypts AES-256-CBC body
 6. `JwtAuthMiddleware` — Validates Bearer token (rejects 401)
 7. YARP Proxy — Routes to backend
@@ -111,11 +111,11 @@ Sentinel is a zero-trust, multi-layered API gateway that combines network defens
 - `GET /token?subject=<username>` — Issue JWT token (no auth required)
 - `GET /posts, POST /posts, ...` — Protected proxy endpoints (JWT required)
 
-**Logging to CSV:**
-```csv
+**Logging (SQLite):**
+Example row stored in the `requests` table in `Shared/logs/sentinel.db`:
+
 timestamp,src_ip,method,path,status_code,duration_ms,payload_size_bytes,auth_header_present
 2026-04-17T06:46:53Z,::1,POST,/posts,201,1216.607,172,true
-```
 
 ---
 
@@ -128,21 +128,21 @@ timestamp,src_ip,method,path,status_code,duration_ms,payload_size_bytes,auth_hea
 - Saves model to `models/rf_model.pkl`
 
 **Inference Pipeline:** `inference.py`
-- Watches `traffic_log.csv` for new rows (watchdog + 2-second polling)
+- Polls `Shared/logs/sentinel.db` (table `requests`) for new rows
 - Extracts features from each request
 - Predicts: "Normal", "DDoS", or "Data Exfiltration"
 - Outputs confidence score (0.0 - 1.0)
-- Appends to `inference_log.csv`
+- Writes prediction rows into the `inferences` table in `Shared/logs/sentinel.db`
 
-**Output to CSV:**
-```csv
+**Inference Output (DB):**
+Example row stored in the `inferences` table in `Shared/logs/sentinel.db`:
+
 timestamp,src_ip,prediction,confidence_score
 2026-04-17T06:46:53Z,::1,Normal,0.9960
-```
 
 ---
 
-### Module 3: Dashboard (Streamlit)
+### Module 3: Dashboard (Flask)
 
 **File:** `Dashboard/app.py`
 
@@ -230,9 +230,9 @@ python inference.py
 
 **Terminal 3 - Dashboard:**
 ```powershell
-cd Sentinel\Intelligence
-venv\Scripts\activate
-streamlit run ..\Dashboard\app.py
+cd Sentinel\Dashboard
+# run the Flask-based dashboard
+python app.py
 ```
 
 ---
@@ -249,8 +249,8 @@ streamlit run ..\Dashboard\app.py
 - **Mitigation:** AES-256-CBC encryption + HMAC-like validation
 - **Rate:** Low risk
 
-#### Repudiation
-- **Mitigation:** Every request logged to traffic_log.csv with timestamp
+- #### Repudiation
+- **Mitigation:** Every request logged to `Shared/logs/sentinel.db` with timestamp
 - **Rate:** Low risk
 
 #### Information Disclosure
@@ -297,11 +297,11 @@ streamlit run ..\Dashboard\app.py
 - **AI confidence:** Average prediction confidence score
 - **Latency p95:** 95th percentile request duration
 
-### CSV-Based Observability
+### SQLite-Based Observability
 
-All events flow through CSV files:
-1. `traffic_log.csv` — Raw request telemetry
-2. `inference_log.csv` — ML predictions
+All events flow through the shared SQLite database at `Shared/logs/sentinel.db`:
+1. `requests` table — Raw request telemetry
+2. `inferences` table — ML predictions
 3. Dashboard reads both for visualization
 
 ### Future Enhancements

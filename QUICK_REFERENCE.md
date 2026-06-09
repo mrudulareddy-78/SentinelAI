@@ -1,6 +1,9 @@
 # 🚀 Sentinel: Quick Reference Commands
 
 Copy-paste these commands to quickly demonstrate all new features.
+# 🚀 Sentinel: Quick Reference Commands
+
+Copy-paste these commands to quickly demonstrate all new features.
 
 ---
 
@@ -88,8 +91,8 @@ venv\Scripts\activate
 
 # 1. DDoS Attack (high frequency, low payload)
 python ddos_simulator.py ddos 100
-# Expected: 100 rows added to Shared/logs/traffic_log.csv
-# ML Prediction: "DDoS" with 70%+ confidence
+# Expected: 100 events recorded in Shared/logs/sentinel.db (table `requests`)
+# ML Prediction: "DDoS" with 70%+ confidence (written to `inferences` table)
 
 # 2. Port Scan (reconnaissance)
 python ddos_simulator.py port_scan 50
@@ -106,8 +109,8 @@ python ddos_simulator.py normal 10
 # Expected: Benign traffic
 # ML Prediction: "Normal" with 95%+ confidence
 
-# Verify predictions
-type Shared\logs\inference_log.csv | findstr "DDoS" | Measure-Object -Line
+# Verify predictions (example using sqlite3):
+# sqlite3 Shared/logs/sentinel.db "SELECT COUNT(1) FROM inferences WHERE prediction='DDoS';"
 # Should show ~100 DDoS predictions
 ```
 
@@ -168,17 +171,17 @@ cd Sentinel\Gateway
 cd Sentinel\Intelligence
 venv\Scripts\activate
 python train_model.py     # Train if model.pkl doesn't exist
-python inference.py       # Watch traffic_log.csv
-# Should show: "[inference] Watching traffic_log.csv for new rows..."
+python inference.py       # Polls `requests` table in Shared/logs/sentinel.db
+# Should show: "[intelligence] Processed X new event(s)." or similar
 ```
 
 ### Terminal 3: Start Dashboard
 
 ```powershell
-cd Sentinel\Intelligence
+cd Sentinel\Dashboard
 venv\Scripts\activate
-streamlit run ..\Dashboard\app.py --logger.level=warning
-# Should show: "You can now view your Streamlit app in your browser at http://localhost:8501"
+python app.py --logger.level=warning
+# Should show: the Flask dashboard running and accessible at http://localhost:8501
 ```
 
 ### Terminal 4: Generate Attacks
@@ -200,7 +203,6 @@ python ddos_simulator.py normal 20
 # 4. Watch dashboard normalize (gauge turns GREEN)
 ```
 
----
 
 ## 📈 Metrics to Show Your Professor
 
@@ -209,9 +211,9 @@ python ddos_simulator.py normal 20
 ```powershell
 # Show 5-layer defense:
 # Terminal 1: Gateway shows requests arriving
-# Terminal 2: Each request logged to traffic_log.csv
-# Terminal 2: Inference processes requests
-# Terminal 2: Predictions written to inference_log.csv
+# Terminal 2: Each request logged to the `requests` table in Shared/logs/sentinel.db
+# Terminal 2: Inference processes requests and writes predictions to the `inferences` table
+# Terminal 3: Dashboard visualizes threat level
 # Terminal 3: Dashboard visualizes threat level
 
 # Point out:
@@ -246,11 +248,8 @@ pytest test_inference.py -v --tb=short
 # 5. Generate normal: 10 requests
 # 6. Check predictions: 100% show "Normal" with 95%+ confidence
 
-tail -30 Shared\logs\inference_log.csv | Select-String "Data Exfiltration" | Measure-Object
-# Shows high detectioncount
 ```
 
----
 
 ## 🎯 Presentation Talking Points
 
@@ -272,7 +271,6 @@ tail -30 Shared\logs\inference_log.csv | Select-String "Data Exfiltration" | Mea
 ### Rate Limiting
 > "The token bucket rate limiter provides volumetric DDoS protection by limiting each IP to 300 requests per minute."
 
----
 
 ## 🔍 Troubleshooting Quick Fixes
 
@@ -290,17 +288,16 @@ pip install -r requirements.txt --force-reinstall
 pytest test_inference.py -v
 
 # DDoS simulator stuck
-# Stop inference.py (it holds lock on traffic_log.csv)
+# Stop inference.py if necessary (it polls the SQLite DB)
 # Retry simulator
 python ddos_simulator.py ddos 100
 
 # Dashboard shows "No data"
-# 1. Verify Shared/logs/inference_log.csv exists
+# 1. Verify Shared/logs/sentinel.db exists and has `inferences` table
 # 2. Run inference manually: cd Intelligence && python inference.py
-# 3. Restart streamlit: streamlit run ..\Dashboard\app.py
+# 3. Start the dashboard: cd Dashboard && python app.py
 ```
 
----
 
 ## 📋 File Structure to Show
 
@@ -325,8 +322,7 @@ Sentinel/
 │   └── models/rf_model.pkl
 ├── Dashboard/app.py
 ├── Shared/logs/
-│   ├── traffic_log.csv (monitored by inference)
-│   └── inference_log.csv (read by dashboard)
+│   ├── sentinel.db (SQLite) with `requests` and `inferences` tables
 ├── ARCHITECTURE.md ✅ NEW (400 lines)
 ├── THREAT_MODEL.md ✅ NEW (300 lines)
 ├── ADVANCED_FEATURES.md ✅ NEW (350 lines)
@@ -334,15 +330,14 @@ Sentinel/
 └── QUICK_REFERENCE.md ✅ THIS FILE
 ```
 
----
 
 ## ⏱️ Demo Timeline (15 minutes)
 
 | Time | Action | Command | Expected Output |
 |------|--------|---------|-----------------|
 | 0:00 | Start Gateway | `dotnet run` | "Now listening..." |
-| 0:30 | Start Inference | `cd Intelligence && python inference.py` | "Watching traffic_log..." |
-| 1:00 | Start Dashboard | `streamlit run app.py` | Browser opens at 8501 |
+| 0:30 | Start Inference | `cd Intelligence && python inference.py` | Polls `requests` table in Shared/logs/sentinel.db |
+| 1:00 | Start Dashboard | `python app.py` | Browser opens at 8501 |
 | 1:30 | Generate DDoS | `python ddos_simulator.py ddos 200` | 200 rows added |
 | 2:30 | Show Detection | Browser shows RED gauge | Threat: "DDoS" 70-95% |
 | 4:00 | Generate Normal | `python ddos_simulator.py normal 20` | 20 rows added |
@@ -354,20 +349,18 @@ Sentinel/
 | 10:00 | Show Threat Model | Open THREAT_MODEL.md | Show risk matrix |
 | 15:00 | Q&A | — | Ready for discussion |
 
----
 
 ## 💡 Pro Tips for Demo
 
 1. **Pre-generate attack data** before demo: `python ddos_simulator.py ddos 500`
 2. **Have dashboard open in browser** before starting presentation
 3. **Screenshot threat gauge turning RED** for slides
-4. **Show inference_log.csv** in Excel to prove predictions
+4. **Query `inferences` table** in `Shared/logs/sentinel.db` to prove predictions
 5. **Have ARCHITECTURE.md printed** for Q&A
 6. **Mention OWASP compliance** when discussing security headers
 7. **Emphasize "production-grade"** when showing rate limiting
 8. **Point out "zero-trust"** when explaining middleware pipeline
 
----
 
 ## 🎓 Academic Points to Assert
 
